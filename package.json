@@ -1,6 +1,6 @@
 {
   "name": "hardbox-passport-google",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A module that allows hardbox to execute authentication using passport and maintain user session",
   "main": "index.js",
   "scripts": {
