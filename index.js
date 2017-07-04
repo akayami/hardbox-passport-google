@@ -70,7 +70,7 @@ module.exports = function(config) {
 		);
 
 		app.use(config.secureNamespace, function(req, res, next) {
-			if (!req.user) {
+			if (!req.user && config.allowUnauthorized !== true) {
 				return res.redirect(config.loginURL);
 			}
 			next();
