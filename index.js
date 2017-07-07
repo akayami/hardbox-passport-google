@@ -3,6 +3,7 @@ const session = require('express-session');
 const ejs = require('ejs');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
+const HttpForbidden = require('./lib/error/http/forbidden');
 
 module.exports = function(config) {
 
@@ -10,36 +11,19 @@ module.exports = function(config) {
 		const express = require('express');
 		const app = express();
 
-		if (config.session.storeConf) {
-			const sessionStore = require(config.session.storeConf.type)(session);
-			config.session.store = new sessionStore(config.session.storeConf.config);
-		}
-
-		app.use(session(config.session));
-
-		app.use(config.secureNamespace, passport.initialize());
-		app.use(config.secureNamespace, passport.session());
-
 		passport.serializeUser(function(user, done) {
 			done(null, user);
 		});
 
-		passport.deserializeUser(function(user, done) {
-			if (!config.google.allowedDomains || config.google.allowedDomains.includes(user.domain)) {
-				done(null, user);
+		passport.deserializeUser(function(obj, done) {
+			// done(null, obj);
+			if (!config.google.allowedDomains || config.google.allowedDomains.includes(obj.domain)) {
+				done(null, obj);
 			} else {
-				done(new HttpForbidden('Domain mismatch: ' + user.domain + ' not in ' + config.google.allowedDomains))
+				done(new HttpForbidden('Domain mismatch: ' + obj.domain + ' not in ' + config.google.allowedDomains))
 			}
 		});
 
-		app.set('view engine', 'ejs');
-
-
-		if (config.forwardLogin === false) {
-			app.get('/login', function(req, res, next) {
-				res.render('login');
-			})
-		}
 
 		passport.use(new GoogleStrategy({
 				clientID: config.google.login.clientID,
@@ -53,6 +37,25 @@ module.exports = function(config) {
 				});
 			}
 		));
+
+		app.set('view engine', 'ejs');
+
+		app.use(session(config.session));
+
+		if (config.session.storeConf) {
+			const sessionStore = require(config.session.storeConf.type)(session);
+			config.session.store = new sessionStore(config.session.storeConf.config);
+		}
+
+		app.use(config.secureNamespace, passport.initialize());
+		app.use(config.secureNamespace, passport.session());
+
+		if (config.forwardLogin === false) {
+			app.get(config.loginURL, function(req, res, next) {
+				req.internalURL = true;
+				res.render('login');
+			})
+		}
 
 		app.get(config.google.login.loginURL,
 			passport.authenticate('google', {
@@ -69,25 +72,35 @@ module.exports = function(config) {
 			}
 		);
 
-		app.use(config.secureNamespace, function(req, res, next) {
-			if (!req.user && config.allowUnauthorized !== true) {
-				return res.redirect(config.loginURL);
-			}
-			next();
-		});
-
 		app.get(config.logoutURL, function(req, res, next) {
+			req.internalURL = true;
 			req.session.destroy();
 			req.logout();
 			res.redirect(config.loginURL);
 		});
 
+		app.use(config.secureNamespace, function(req, res, next) {
+			if (!req.user) {
+				if(config.allowUnauthorized !== true && req.internalURL !== true) {
+					res.redirect(config.loginURL);
+				} else {
+					next();
+				}
+			} else {
+				next();
+			}
+		})
+
 		app.use(function(err, req, res, next) {
-			cb(err);
+			if(err instanceof HttpForbidden) {
+				req.session.destroy();
+				req.logout();
+			}
+			cb(err, req, res);
 		})
 
 		app.use(function(req, res, next) {
-			if(req.user) {
+			if (req.user) {
 				res.proxyHeaders.push(['X-User-Info-Proxy', JSON.stringify(req.user)]);
 			}
 			cb(null, req, res);
