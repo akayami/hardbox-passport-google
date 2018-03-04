@@ -1,6 +1,6 @@
 {
   "name": "hardbox-passport-google",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "A module that allows hardbox to execute authentication using passport and maintain user session",
   "main": "index.js",
   "scripts": {
@@ -15,6 +15,7 @@
   "license": "ISC",
   "dependencies": {
     "connect-redis": "^3.3.3",
+    "ejs": "^2.5.7",
     "express": "^4.16.2",
     "express-session": "^1.15.6",
     "passport": "^0.4.0",
