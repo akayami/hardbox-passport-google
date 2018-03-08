@@ -1,3 +1,4 @@
+const morgan = require('morgan');
 const express = require('express');
 const session = require('express-session');
 const ejs = require('ejs');
@@ -8,10 +9,9 @@ const HttpForbidden = require('./lib/error/http/forbidden');
 module.exports = function(config) {
 
 	return function(req, res, cb) {
-		const express = require('express');
-		const app = express();
 
 		passport.serializeUser(function(user, done) {
+//			console.log('serialize');
 			done(null, user);
 		});
 
@@ -38,17 +38,26 @@ module.exports = function(config) {
 			}
 		));
 
-		app.set('view engine', 'ejs');
+		const app = express();
 
-		app.use(session(config.session));
+		app.use(morgan(config.morgan.format, config.morgan.options));
+		app.set('view engine', 'ejs');
 
 		if (config.session.storeConf) {
 			const sessionStore = require(config.session.storeConf.type)(session);
 			config.session.store = new sessionStore(config.session.storeConf.config);
 		}
 
+		app.use(session(config.session));
+
 		app.use(config.secureNamespace, passport.initialize());
 		app.use(config.secureNamespace, passport.session());
+
+		app.use(config.google.login.callbackURL, passport.initialize());
+		app.use(config.google.login.callbackURL, passport.session());
+
+		// app.use(passport.initialize());
+		// app.use(passport.session());
 
 		if (config.forwardLogin === false) {
 			app.get(config.loginURL, function(req, res, next) {
@@ -89,7 +98,7 @@ module.exports = function(config) {
 			} else {
 				next();
 			}
-		})
+		});
 
 		app.use(function(err, req, res, next) {
 			if(err instanceof HttpForbidden) {
@@ -97,15 +106,15 @@ module.exports = function(config) {
 				req.logout();
 			}
 			cb(err, req, res);
-		})
+		});
 
 		app.use(function(req, res, next) {
 			if (req.user) {
-				res.proxyHeaders.push(['X-User-Info-Proxy', JSON.stringify(req.user)]);
+				res.proxyHeaders.push([config.headerName, JSON.stringify(req.user)]);
 			}
 			cb(null, req, res);
-		})
+		});
 
 		app(req, res)
 	}
-}
+};
