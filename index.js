@@ -6,21 +6,24 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 const HttpForbidden = require('./lib/error/http/forbidden');
 
-module.exports = function(config) {
+module.exports = function (config) {
 
-	return function(req, res, cb) {
+	return function (req, res, cb) {
 
-		passport.serializeUser(function(user, done) {
+		passport.serializeUser(function (user, done) {
 //			console.log('serialize');
 			done(null, user);
 		});
 
-		passport.deserializeUser(function(obj, done) {
+		passport.deserializeUser(function (obj, done) {
 			// done(null, obj);
-			if (!config.google.allowedDomains || config.google.allowedDomains.includes(obj.domain)) {
+			if (!config.allowedDomains && config.google.allowedDomains) {
+				config.allowedDomains = config.google.allowedDomains;
+			}
+			if (!config.allowedDomains || config.allowedDomains.includes(obj.domain)) {
 				done(null, obj);
 			} else {
-				done(new HttpForbidden('Domain mismatch: ' + obj.domain + ' not in ' + config.google.allowedDomains))
+				done(new HttpForbidden('Domain mismatch: ' + obj.domain + ' not in ' + config.allowedDomains))
 			}
 		});
 
@@ -30,7 +33,7 @@ module.exports = function(config) {
 				clientSecret: config.google.login.clientSecret,
 				callbackURL: config.google.login.callbackURL
 			},
-			function(accessToken, refreshToken, profile, done) {
+			function (accessToken, refreshToken, profile, done) {
 				done(null, {
 					profile: profile,
 					domain: profile._json.domain
@@ -60,7 +63,7 @@ module.exports = function(config) {
 		// app.use(passport.session());
 
 		if (config.forwardLogin === false) {
-			app.get(config.loginURL, function(req, res, next) {
+			app.get(config.loginURL, function (req, res, next) {
 				req.internalURL = true;
 				res.render('login');
 			})
@@ -76,21 +79,21 @@ module.exports = function(config) {
 			passport.authenticate('google', {
 				failureRedirect: config.loginURL
 			}),
-			function(req, res) {
+			function (req, res) {
 				res.redirect(config.homePath);
 			}
 		);
 
-		app.get(config.logoutURL, function(req, res, next) {
+		app.get(config.logoutURL, function (req, res, next) {
 			req.internalURL = true;
 			req.session.destroy();
 			req.logout();
 			res.redirect(config.loginURL);
 		});
 
-		app.use(config.secureNamespace, function(req, res, next) {
+		app.use(config.secureNamespace, function (req, res, next) {
 			if (!req.user) {
-				if(config.allowUnauthorized !== true && req.internalURL !== true) {
+				if (config.allowUnauthorized !== true && req.internalURL !== true) {
 					res.redirect(config.loginURL);
 				} else {
 					next();
@@ -100,15 +103,15 @@ module.exports = function(config) {
 			}
 		});
 
-		app.use(function(err, req, res, next) {
-			if(err instanceof HttpForbidden) {
+		app.use(function (err, req, res, next) {
+			if (err instanceof HttpForbidden) {
 				req.session.destroy();
 				req.logout();
 			}
 			cb(err, req, res);
 		});
 
-		app.use(function(req, res, next) {
+		app.use(function (req, res, next) {
 			if (req.user) {
 				res.proxyHeaders.push([config.headerName, JSON.stringify(req.user)]);
 			}
