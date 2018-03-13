@@ -5,6 +5,7 @@ const ejs = require('ejs');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 const HttpForbidden = require('./lib/error/http/forbidden');
+const path = require('path');
 
 module.exports = function (config) {
 
@@ -43,6 +44,7 @@ module.exports = function (config) {
 
 		const app = express();
 
+		app.set('views', path.join(__dirname, '/views'));
 		app.use(morgan(config.morgan.format, config.morgan.options));
 		app.set('view engine', 'ejs');
 
