@@ -32,7 +32,7 @@ module.exports = function (config) {
 		passport.use(new GoogleStrategy({
 				clientID: config.google.login.clientID,
 				clientSecret: config.google.login.clientSecret,
-				callbackURL: config.google.login.callbackURL
+				callbackURL: config.google.login.fullCallbackURL
 			},
 			function (accessToken, refreshToken, profile, done) {
 				done(null, {
