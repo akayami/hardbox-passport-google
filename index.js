@@ -9,57 +9,63 @@ const path = require('path');
 
 module.exports = function (config) {
 
-	return function (req, res, cb) {
-
-		passport.serializeUser(function (user, done) {
+	passport.serializeUser(function (user, done) {
 //			console.log('serialize');
-			done(null, user);
-		});
+		done(null, user);
+	});
 
-		passport.deserializeUser(function (obj, done) {
-			// done(null, obj);
-			if (!config.allowedDomains && config.google.allowedDomains) {
-				config.allowedDomains = config.google.allowedDomains;
-			}
-			if (!config.allowedDomains || config.allowedDomains.includes(obj.domain)) {
-				done(null, obj);
-			} else {
-				done(new HttpForbidden('Domain mismatch: ' + obj.domain + ' not in ' + config.allowedDomains))
-			}
-		});
-
-
-		passport.use(new GoogleStrategy({
-				clientID: config.google.login.clientID,
-				clientSecret: config.google.login.clientSecret,
-				callbackURL: config.google.login.fullCallbackURL
-			},
-			function (accessToken, refreshToken, profile, done) {
-				done(null, {
-					profile: profile,
-					domain: profile._json.domain
-				});
-			}
-		));
-
-		const app = express();
-
-		app.set('views', path.join(__dirname, '/views'));
-		app.use(morgan(config.morgan.format, config.morgan.options));
-		app.set('view engine', 'ejs');
-
-		if (config.session.storeConf) {
-			const sessionStore = require(config.session.storeConf.type)(session);
-			config.session.store = new sessionStore(config.session.storeConf.config);
+	passport.deserializeUser(function (obj, done) {
+		// done(null, obj);
+		if (!config.allowedDomains && config.google.allowedDomains) {
+			config.allowedDomains = config.google.allowedDomains;
 		}
+		if (!config.allowedDomains || config.allowedDomains.includes(obj.domain)) {
+			done(null, obj);
+		} else {
+			done(new HttpForbidden('Domain mismatch: ' + obj.domain + ' not in ' + config.allowedDomains))
+		}
+	});
 
-		app.use(session(config.session));
 
-		app.use(config.secureNamespace, passport.initialize());
-		app.use(config.secureNamespace, passport.session());
+	passport.use(new GoogleStrategy({
+			clientID: config.google.login.clientID,
+			clientSecret: config.google.login.clientSecret,
+			callbackURL: config.google.login.fullCallbackURL
+		},
+		function (accessToken, refreshToken, profile, done) {
+			done(null, {
+				profile: profile,
+				domain: profile._json.domain
+			});
+		}
+	));
 
-		app.use(config.google.login.callbackURL, passport.initialize());
-		app.use(config.google.login.callbackURL, passport.session());
+	const app = express();
+
+	app.set('views', path.join(__dirname, '/views'));
+	app.use(morgan(config.morgan.format, config.morgan.options));
+	app.set('view engine', 'ejs');
+
+	if (config.session.storeConf) {
+		const sessionStore = require(config.session.storeConf.type)(session);
+		config.session.store = new sessionStore(config.session.storeConf.config);
+	}
+
+	app.use(session(config.session));
+
+	app.use(config.secureNamespace, passport.initialize());
+	app.use(config.secureNamespace, passport.session());
+
+	app.use(config.google.login.callbackURL, passport.initialize());
+	app.use(config.google.login.callbackURL, passport.session());
+
+	app.get(config.google.login.loginURL,
+		passport.authenticate('google', {
+			scope: config.google.scope
+		})
+	);
+
+	return (req, res, cb) => {
 
 		// app.use(passport.initialize());
 		// app.use(passport.session());
@@ -70,12 +76,6 @@ module.exports = function (config) {
 				res.render('login');
 			})
 		}
-
-		app.get(config.google.login.loginURL,
-			passport.authenticate('google', {
-				scope: config.google.scope
-			})
-		);
 
 		app.get(config.google.login.callbackURL,
 			passport.authenticate('google', {
